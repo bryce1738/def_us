@@ -1,0 +1,95 @@
+"""File name = def_us.py
+file can be referenced for the control of the Ultrasonic sensor.
+Uses include: Setting the Servo Angle, Take readings at three positions
+main.py Requirements: define, s_state = [], r_state = [] and l_state =[] in main.py file """
+
+from machine import PWM, Pin
+from time import sleep
+import machine
+from machine import Pin
+import time
+
+
+class sonic:
+    """
+    A ``sonic`` object is used to control a HCSR04 ultrasonic sensor.
+    """
+
+    def __init__(self, trigger_pin, echo_pin, echo_timeout_us=4000*2/(340.29*1e-3)):
+        """
+        - trigger_pin: Output pin to send pulses
+        - echo_pin: Input pin listens for reflection to estimate time of flight.
+        - echo_timeout_us: Timeout in microseconds to listen to echo pin.
+        By default the timeout is set to the max range limit of the sensor, 4m
+        """
+        # Initialise constants
+        self.echo_timeout_us = int(echo_timeout_us)
+        self.speed_sound = 340.29  # m/s
+
+        # Initialise the TRIG output pin
+        self.trigger = Pin(trigger_pin, mode=Pin.OUT)
+        self.trigger.value(0)
+
+        # Initialise the ECHO input pin
+        self.echo = Pin(echo_pin, mode=Pin.IN)
+
+    def distance_mm(self):
+        """
+        Estimate distance to obstacle in front of the ultrasonic sensor in mm.
+        Sends a 10us pulse to 'trigger' pin and listens on 'echo' pin.
+        We use the method `machine.time_pulse_us()` to count the microseconds
+        passed before the echo is received.
+        The time of flight is used to calculate the estimated distance.
+        """
+        # Send a 10us HIGH pulse to trigger the ultrasonic burst
+        self.trigger.value(1)
+        time.sleep_us(10)
+        self.trigger.value(0)
+        # Read length of time pulse
+        duration = machine.time_pulse_us(self.echo, 1, self.echo_timeout_us)
+        # Calculate the distance in mm, based on the delay before we hear
+        # an echo and the constant speed of sound.
+        # Note: duration is halved as the audio wave must travel there and back.
+        mm = 0.5 * duration * 1e-6 * self.speed_sound * 1e3
+        return mm
+
+s_state = []
+r_state = []
+l_state = []
+
+TRIG = 3
+ECHO = 2
+us = sonic(TRIG, ECHO)
+usd = us.distance_mm()
+pwm = PWM(Pin(15))
+pwm.freq(50)
+
+"""function to convert the degrees to motor angle"""
+
+def setServoAngle(angle):
+    position = int(8000*(angle/180) + 1000)
+    pwm.duty_u16(position)
+
+"""function to sweep the servo motor of the ultrasonic sensor to the positions 'straight', 
+'right' and left. Command uses the call def_us.servo_sweep(direction)"""
+
+def servo_sweep(direction):
+    if direction == 'straight':
+        for pos in range(0, 180, 20):  # 0 (range1), 180 (range 2), 20 (speed of sweep)
+            setServoAngle(90)       # Angle in degrees
+            sleep(0.05)     # time between sweep
+            dists = usd
+            s_state.append(dists)      # add usd to s_state array in main.py
+    elif direction == 'right':
+        for pos in range(0, 180, 20):
+            setServoAngle(0)
+            sleep(0.05)
+            distr = usd
+            r_state.append(distr)
+    elif direction == 'left':
+        for pos in range(0, 180, 20):
+            setServoAngle(180)
+            sleep(0.05)
+            distl = usd
+            l_state.append(distl)
+
